@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG 澳門實境探索地圖 v1.2.08</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        html, body, #map-container {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background-color: #111;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        
+        /* 🌫️ 全螢幕畫布迷霧 */
+        #fog-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;            
+            pointer-events: none;  
+            opacity: 0.85;         
+        }
+
+        /* 💬 頂層白色文字對話框 */
+        #location-bubble {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;             
+            background: #ffffff;       
+            color: #222222;            
+            padding: 12px 24px;
+            border-radius: 20px;       
+            font-family: system-ui, -apple-system, sans-serif;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 4px solid #202190; 
+            min-width: 260px;
+            max-width: 85%;            
+            pointer-events: none;      
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .street-zh {
+            font-size: 18px;
+            font-weight: bold;
+            color: #111111;
+        }
+        .street-pt {
+            font-size: 13px;           
+            font-weight: 500;
+            color: #666666;            
+            font-style: italic;
+            line-height: 1.2;
+        }
+
+        /* 📍 右側功能按鈕欄 */
+        .action-buttons-container {
+            position: absolute;
+            right: 16px;
+            top: 110px;                
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .circle-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* 🕹️ D-Pad 介面 */
+        #dpad-container {
+            position: absolute;
+            bottom: 275px; 
+            right: 16px;
+            z-index: 1000;
+            display: none; 
+            grid-template-columns: repeat(3, 45px);
+            grid-template-rows: repeat(3, 45px);
+            gap: 5px;
+        }
+        .dpad-btn {
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            border: 2px solid #666;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        .dpad-btn:active {
+            background: #ff9800;
+            color: white;
+        }
+        .dpad-empty {
+            pointer-events: none;
+        }
+
+        /* 狀態與控制面板 (因新增按鈕稍微調整高度) */
+        #status-panel {
+            position: absolute;
+            bottom: 25px;         
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.88);
+            color: #fff;
+            padding: 12px;
+            border-radius: 12px;
+            font-family: sans-serif;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            width: 310px;
+        }
+        
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        
+        .panel-btn {
+            padding: 7px 4px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            color: white;
+        }
+        .btn-mode-gps { background: #2196F3; }
+        .btn-mode-dpad { background: #9c27b0; }
+        .btn-io-download { background: #4CAF50; }
+        .btn-io-upload { background: #FF9800; }
+        
+        /* 🔋 節能模式專用顏色樣式 */
+        .btn-power-high { background: #e91e63; grid-column: span 2; }
+        .btn-power-save { background: #009688; grid-column: span 2; }
+        
+        .btn-danger { background: #ff4d4d; grid-column: span 2; margin-top: 2px;}
+    </style>
+</head>
+<body>
+
+    <div id="map-container">
+        <div id="map"></div>
+        <canvas id="fog-canvas"></canvas>
+    </div>
+
+    <div id="location-bubble">
+        <span class="street-zh" id="bubble-zh">📍 正在尋找GPS訊號...</span>
+        <span class="street-pt" id="bubble-pt">Procura sinal de GPS...</span>
+    </div>
+
+    <div class="action-buttons-container">
+        <button class="circle-btn" onclick="recenterMap()">📍</button>
+        <button class="circle-btn" onclick="shareProgress()">📤</button>
+    </div>
+
+    <div id="dpad-container">
+        <div class="dpad-empty"></div>
+        <button class="dpad-btn" onclick="movePlayerSimulated('UP')">🔼</button>
+        <div class="dpad-empty"></div>
+        
+        <button class="dpad-btn" onclick="movePlayerSimulated('LEFT')">◀️</button>
+        <div class="dpad-btn" style="background: #9c27b0; color: white; font-size: 14px;">🕹️</div>
+        <button class="dpad-btn" onclick="movePlayerSimulated('RIGHT')">▶️</button>
+        
+        <div class="dpad-empty"></div>
+        <button class="dpad-btn" onclick="movePlayerSimulated('DOWN')">🔽</button>
+        <div class="dpad-empty"></div>
+    </div>
+
+    <input type="file" id="file-selector" accept=".json" onchange="uploadSaveFile(event)" style="display: none;">
+
+    <div id="status-panel">
+        <div style="font-weight: bold; font-size: 15px; color: #ff9800; margin-bottom: 4px;">🗺️ 澳門探索地圖 (v1.2.08) 📸</div>
+        <div id="gps-status" style="font-size: 12px; min-height: 32px;">定位中...</div>
+        
+        <div class="btn-group">
+            <button id="btn-toggle-mode" class="panel-btn btn-mode-gps" onclick="toggleControlMode()">切換模式：🛰️GPS</button>
+            
+            <button id="btn-toggle-power" class="panel-btn btn-power-high" onclick="togglePowerMode()">運行模式：⚡高效能模式</button>
+            
+            <button class="panel-btn btn-io-download" onclick="downloadSaveFile()">💾 下載目前進度</button>
+            <button class="panel-btn btn-io-upload" onclick="triggerUploadClick()">📂 上載既有進度</button>
+            
+            <button class="panel-btn btn-danger" onclick="resetGame()">🛑 清除全部紀錄</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-geometryutil@0.10.3/src/leaflet.geometryutil.js"></script>
+    
+    <script>
+        const macauBounds = L.latLngBounds(
+            L.latLng(22.0900, 113.5000), 
+            L.latLng(22.2300, 113.6200)  
+        );
+
+        let currentLat = 22.19746;
+        let currentLng = 113.54086;
+        let hasInitialPosition = false; 
+        let unlockedPaths = []; 
+        let playerMarker = null; 
+        
+        let isDpadMode = false; 
+        let isPowerSaveMode = false; // 🌟 V1.2.08 預設為高效能即時渲染模式
+        let watchId = null;     
+        let lastApiRequestTime = 0;
+        const stepSize = 0.00015; 
+
+        const map = L.map('map', {
+            zoomControl: false,          
+            maxBounds: macauBounds,       
+            maxBoundsViscosity: 1.0,     
+            minZoom: 14,                  
+            maxZoom: 19                   
+        }).setView([currentLat, currentLng], 17); 
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        const canvas = document.getElementById('fog-canvas');
+        const ctx = canvas.getContext('2d');
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            tempCanvas.width = window.innerWidth;
+            tempCanvas.height = window.innerHeight;
+            drawFog(); 
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // 雙層迷霧混合演算
+        function drawFog() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (unlockedPaths.length === 0) return;
+
+            const centerLatLng = map.getCenter();
+            const centerScreenPos = map.latLngToContainerPoint(centerLatLng);
+
+            const radius80LatLng = L.GeometryUtil.destination(centerLatLng, 0, 80);
+            const radius80ScreenPos = map.latLngToContainerPoint(radius80LatLng);
+            const pixels80 = Math.abs(centerScreenPos.y - radius80ScreenPos.y);
+
+            const radius50LatLng = L.GeometryUtil.destination(centerLatLng, 0, 50);
+            const radius50ScreenPos = map.latLngToContainerPoint(radius50LatLng);
+            const pixels50 = Math.abs(centerScreenPos.y - radius50ScreenPos.y);
+
+            // Layer 1: 80米融合半透明
+            tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+            tempCtx.fillStyle = '#000000';
+            tempCtx.globalAlpha = 1.0; 
+            unlockedPaths.forEach(coord => {
+                const screenPos = map.latLngToContainerPoint([coord[0], coord[1]]);
+                tempCtx.beginPath();
+                tempCtx.arc(screenPos.x, screenPos.y, pixels80, 0, Math.PI * 2);
+                tempCtx.fill();
+            });
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.globalAlpha = 0.45; 
+            ctx.drawImage(tempCanvas, 0, 0);
+
+            // Layer 2: 50米全透明
+            ctx.globalAlpha = 1.0; 
+            unlockedPaths.forEach(coord => {
+                const screenPos = map.latLngToContainerPoint([coord[0], coord[1]]);
+                ctx.beginPath();
+                ctx.arc(screenPos.x, screenPos.y, pixels50, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        // 🌟【V1.2.08 核心技術突破】動態事件切換引擎
+        function setupMapRenderListeners() {
+            // 先解除綁定所有舊有的移動事件，防止疊加衝突
+            map.off('move', drawFog);
+            map.off('moveend', drawFog);
+
+            if (isPowerSaveMode) {
+                // 🔋 省電模式：改聽 moveend 訊號 (手放開、地圖靜止時才算一次)
+                map.on('moveend', drawFog);
+            } else {
+                // ⚡ 高效能模式：監聽 move 訊號 (拖動過程中瘋狂即時更新)
+                map.on('move', drawFog);
+            }
+            // 縮放與視窗改變大小不論哪種模式都必須立即刷新
+            map.on('zoomend', drawFog);
+        }
+
+        // 🌟【V1.2.08 新增按鈕觸發事件】效能模式切換器
+        function togglePowerMode() {
+            isPowerSaveMode = !isPowerSaveMode;
+            const powerBtn = document.getElementById('btn-toggle-power');
+
+            if (isPowerSaveMode) {
+                powerBtn.innerText = "運行模式：🔋省電模式";
+                powerBtn.className = "panel-btn btn-power-save";
+            } else {
+                powerBtn.innerText = "運行模式：⚡高效能模式";
+                powerBtn.className = "panel-btn btn-power-high";
+            }
+
+            // 重新調配地圖引擎的監聽機制，並強制刷一次迷霧
+            setupMapRenderListeners();
+            drawFog();
+        }
+
+        // Overpass API 街區雷達
+        async function updateStreetOverpass(lat, lng) {
+            const currentTime = Date.now();
+            if (currentTime - lastApiRequestTime < 4000) return; 
+            lastApiRequestTime = currentTime;
+
+            try {
+                const overpassQL = `[out:json];way(around:30,${lat},${lng})[highway];out tags;`;
+                const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQL)}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                let streetZHs = [];
+                let streetPTs = [];
+
+                if (data && data.elements) {
+                    data.elements.forEach(element => {
+                        if (element.tags) {
+                            const nameZH = element.tags['name:zh'] || element.tags['name:zh_tw'] || element.tags['name:zh-TW'] || element.tags['name'];
+                            const namePT = element.tags['name:pt'] || element.tags['official_name:pt'] || element.tags['official_name'];
+
+                            if (nameZH && !streetZHs.includes(nameZH) && isChinese(nameZH)) streetZHs.push(nameZH);
+                            if (namePT && !streetPTs.includes(namePT) && !isChinese(namePT)) streetPTs.push(namePT);
+                        }
+                    });
+                }
+
+                if (streetZHs.length > 0) {
+                    document.getElementById('bubble-zh').innerText = `📍 你目前在 ${streetZHs.join(' 與 ')}`;
+                    document.getElementById('bubble-pt').innerText = streetPTs.length > 0 ? streetPTs.join(' / ') : "Macau";
+                } else {
+                    const backupQL = `[out:json];way(around:70,${lat},${lng})[highway];out tags;`;
+                    const backupRes = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(backupQL)}`).then(r => r.json());
+                    if (backupRes && backupRes.elements && backupRes.elements.length > 0) {
+                        let bZH = backupRes.elements[0].tags['name:zh'] || backupRes.elements[0].tags['name'];
+                        let bPT = backupRes.elements[0].tags['name:pt'] || backupRes.elements[0].tags['official_name'];
+                        if (bZH) {
+                            document.getElementById('bubble-zh').innerText = `📍 鄰近 ${bZH}`;
+                            document.getElementById('bubble-pt').innerText = bPT || "Macau";
+                            return;
+                        }
+                    }
+                    document.getElementById('bubble-zh').innerText = `📍 探索歷史城區中...`;
+                    document.getElementById('bubble-pt').innerText = `Explorando o centro histórico`;
+                }
+            } catch (error) {
+                console.error("Overpass 查詢出錯:", error);
+            }
+        }
+
+        function isChinese(str) { return /[\u4e00-\u9fa5]/.test(str); }
+
+        // 下載 JSON 檔案
+        function downloadSaveFile() {
+            if (unlockedPaths.length === 0) {
+                alert("目前地圖上沒有任何除霧進度可以下載！");
+                return;
+            }
+            const saveData = {
+                gameIdentity: "Macau-Fog-Map-RPG",
+                version: "1.2.08",
+                downloadTimestamp: new Date().toISOString(),
+                lastLocation: [currentLat, currentLng],
+                exploredPaths: unlockedPaths 
+            };
+            const jsonText = JSON.stringify(saveData, null, 2);
+            const blob = new Blob([jsonText], { type: "application/json" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            const today = new Date().toISOString().slice(0, 10);
+            link.download = `macau_fog_save_${today}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function triggerUploadClick() { document.getElementById('file-selector').click(); }
+
+        // 解析玩家上傳檔案
+        function uploadSaveFile(event) {
+            const uploadedFile = event.target.files[0];
+            if (!uploadedFile) return;
+
+            const fileReader = new FileReader();
+            fileReader.onload = function(e) {
+                try {
+                    const parsedData = JSON.parse(e.target.result);
+                    if (parsedData.gameIdentity !== "Macau-Fog-Map-RPG") {
+                        alert("❌ 格式不符：此檔案並非有效的澳門實境探索遊戲存檔！");
+                        return;
+                    }
+
+                    unlockedPaths = parsedData.exploredPaths;
+                    if (parsedData.lastLocation) {
+                        currentLat = parsedData.lastLocation[0];
+                        currentLng = parsedData.lastLocation[1];
+                    }
+
+                    localStorage.setItem('rpg_map_progress_v12', JSON.stringify(unlockedPaths));
+                    localStorage.setItem('rpg_map_last_latlng', JSON.stringify([currentLat, currentLng]));
+
+                    if (!playerMarker) {
+                        playerMarker = L.marker([currentLat, currentLng]).addTo(map);
+                    } else {
+                        playerMarker.setLatLng([currentLat, currentLng]);
+                    }
+                    map.setView([currentLat, currentLng], 17);
+                    
+                    drawFog();
+                    updateStreetOverpass(currentLat, currentLng);
+                    updateStatusUI(0);
+                    alert(`🎉 上載成功！已成功加載檔案中 ${unlockedPaths.length} 個已探索足跡！`);
+                } catch (err) {
+                    alert("❌ 檔案解析失敗：可能因結構毀損！");
+                }
+            };
+            fileReader.readAsText(uploadedFile);
+        }
+
+        function autoLoadSavedProgress() {
+            const savedData = localStorage.getItem('rpg_map_progress_v12');
+            if (savedData) {
+                unlockedPaths = JSON.parse(savedData);
+                if (unlockedPaths.length > 0) {
+                    const lastPoint = unlockedPaths[unlockedPaths.length - 1];
+                    currentLat = lastPoint[0];
+                    currentLng = lastPoint[1];
+                }
+            }
+        }
+
+        // 雙模切換
+        function toggleControlMode() {
+            isDpadMode = !isDpadMode;
+            const toggleBtn = document.getElementById('btn-toggle-mode');
+            const dpadBox = document.getElementById('dpad-container');
+
+            if (isDpadMode) {
+                toggleBtn.innerText = "切換模式：🕹️D-Pad";
+                toggleBtn.className = "panel-btn btn-mode-dpad";
+                dpadBox.style.display = "grid"; 
+                if (watchId !== null) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                }
+                if (!playerMarker) playerMarker = L.marker([currentLat, currentLng]).addTo(map);
+                hasInitialPosition = true;
+                updateStatusUI(0);
+                handleUnlock(currentLat, currentLng);
+            } else {
+                toggleBtn.innerText = "切換模式：🛰️GPS";
+                toggleBtn.className = "panel-btn btn-mode-gps";
+                dpadBox.style.display = "none"; 
+                startGpsTracking();
+            }
+        }
+
+        // D-Pad 模擬移動
+        function movePlayerSimulated(direction) {
+            if (!isDpadMode) return;
+            let nextLat = currentLat;
+            let nextLng = currentLng;
+
+            switch(direction) {
+                case 'UP':    nextLat += stepSize; break;
+                case 'DOWN':  nextLat -= stepSize; break;
+                case 'LEFT':  nextLng -= stepSize; break;
+                case 'RIGHT': nextLng += stepSize; break;
+            }
+
+            if (macauBounds.contains(L.latLng(nextLat, nextLng))) {
+                currentLat = nextLat;
+                currentLng = nextLng;
+                playerMarker.setLatLng([currentLat, currentLng]);
+                map.panTo([currentLat, currentLng]); 
+                updateStatusUI(0);
+                handleUnlock(currentLat, currentLng);
+            }
+        }
+
+        function onLocationSuccess(position) {
+            if (isDpadMode) return; 
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+
+            if (!macauBounds.contains(L.latLng(lat, lng))) {
+                document.getElementById('gps-status').innerHTML = `⚠️ 您不在澳門邊界內`;
+                return;
+            }
+
+            currentLat = lat;
+            currentLng = lng;
+            hasInitialPosition = true;
+
+            updateStatusUI(accuracy);
+
+            if (!playerMarker) {
+                map.setView([currentLat, currentLng], 17); 
+                playerMarker = L.marker([currentLat, currentLng]).addTo(map);
+            } else {
+                playerMarker.setLatLng([currentLat, currentLng]);
+            }
+
+            handleUnlock(currentLat, currentLng);
+        }
+
+        function onLocationError(error) {
+            if (!isDpadMode) document.getElementById('gps-status').innerText = `📡 GPS訊號搜尋中...`;
+        }
+
+        function startGpsTracking() {
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(onLocationSuccess, onLocationError, {
+                    enableHighAccuracy: true, 
+                    timeout: 10000,           
+                    maximumAge: 0             
+                });
+            }
+        }
+
+        function updateStatusUI(accuracy) {
+            if (isDpadMode) {
+                document.getElementById('gps-status').innerHTML = `🕹️ 模擬位置: ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}<br>模式：沙盒測試中 (GPS暫停定位)`;
+            } else {
+                document.getElementById('gps-status').innerHTML = `🛰️ 實時位置: ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}<br>誤差值: ${accuracy.toFixed(1)} 米 (GPS定位中)`;
+            }
+        }
+
+        function recenterMap() {
+            if (hasInitialPosition) map.setView([currentLat, currentLng], 17, { animate: true, duration: 1.0 });
+        }
+
+        function shareProgress() { alert(`📊 目前已走過 ${unlockedPaths.length} 個探索區點！`); }
+
+        function handleUnlock(lat, lng) {
+            let shouldUnlock = true;
+            if (unlockedPaths.length > 0) {
+                const lastPoint = unlockedPaths[unlockedPaths.length - 1];
+                const distance = L.latLng(lastPoint[0], lastPoint[1]).distanceTo(L.latLng(lat, lng));
+                if (distance <= 10) shouldUnlock = false; 
+            }
+
+            if (shouldUnlock) {
+                unlockedPaths.push([lat, lng]);
+                localStorage.setItem('rpg_map_progress_v12', JSON.stringify(unlockedPaths));
+                drawFog();
+                updateStreetOverpass(lat, lng);
+            }
+        }
+
+        function resetGame() {
+            if (confirm("🚨 警告！這將會清除所有的數據，確定嗎？")) {
+                localStorage.removeItem('rpg_map_progress_v12');
+                localStorage.removeItem('rpg_map_last_latlng');
+                location.reload();
+            }
+        }
+
+        // 🚀 初始化啟動
+        autoLoadSavedProgress();
+        resizeCanvas(); 
+        
+        // 🌟 初始化動態監聽綁定 (V1.2.08 核心)
+        setupMapRenderListeners();
+        
+        startGpsTracking();
+    </script>
+</body>
+</html>
