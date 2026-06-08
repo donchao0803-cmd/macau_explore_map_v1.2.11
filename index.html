@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RPG 澳門實境探索地圖 v1.2.09</title>
+    <title>RPG 澳門實境探索地圖 v1.2.11</title>
     
+    <!-- 引入 Leaflet 地圖套件 CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
@@ -37,46 +38,58 @@
             opacity: 0.85;         
         }
 
-        /* 💬 頂層白色文字對話框 */
+        /* 💬 頂層雙語路名框 */
         #location-bubble {
             position: absolute;
             top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
+            left: 78px;                
+            right: 20px;               
             z-index: 1000;             
-            background: #ffffff;       
+            background: linear-gradient(120deg, #ffffff, #E2EBFF);
             color: #222222;            
-            padding: 12px 24px;
-            border-radius: 20px;       
+            padding: 8px 11px;
+            border-radius: 15px;       
             font-family: system-ui, -apple-system, sans-serif;
-            text-align: center;
+            text-align: left;          
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            border: 4px solid #202190; 
-            min-width: 260px;
-            max-width: 85%;            
-            pointer-events: none;      
+            border: 4px solid #265dad;           
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 2px;
         }
+        
         .street-zh {
-            font-size: 18px;
-            font-weight: bold;
-            color: #111111;
-        }
-        .street-pt {
-            font-size: 13px;           
-            font-weight: 500;
-            color: #666666;            
-            font-style: italic;
-            line-height: 1.2;
-        }
+    		font-size: 18px;
+    		font-weight: bold;
+    		color: #000000;
+    		/* Multi-line clamp configuration */
+   		 	display: -webkit-box;
+    		-webkit-box-orient: vertical;
+    		-webkit-line-clamp: 3; /* Change this number to allow 3, 4, etc. lines */
+    		overflow: hidden;
+    		/* text-overflow: clip; <-- Remove or comment this out */
+		}
 
-        /* 📍 右側功能按鈕欄 */
+		.street-pt {
+    		font-size: 13px;           
+    		font-weight: 500;
+    		color: #555555;            
+    		font-style: italic;
+    		line-height: 1.2;
+    		/* Multi-line clamp configuration */
+    		display: -webkit-box;
+    		-webkit-box-orient: vertical;
+    		-webkit-line-clamp: 3; /* Change this number to allow 3, 4, etc. lines */
+    		overflow: hidden;
+            white-space: pre-wrap;
+    		/* text-overflow: clip; <-- Remove or comment this out */
+		}
+
+        /* 📍 右側功能快捷按鈕欄 */
         .action-buttons-container {
             position: absolute;
-            right: 16px;
-            top: 110px;                
+            right: 23px;
+            top: 145px;                
             z-index: 1000;
             display: flex;
             flex-direction: column;
@@ -97,10 +110,10 @@
             user-select: none;
         }
 
-        /* 🕹️ D-Pad 介面 */
+        /* 🕹️ D-Pad 介面 (🌟 V1.2.11 微調：因應底部面板變矮，D-Pad 下移至合適高度) */
         #dpad-container {
             position: absolute;
-            bottom: 275px; 
+            bottom: 110px; 
             right: 16px;
             z-index: 1000;
             display: none; 
@@ -109,11 +122,11 @@
             gap: 5px;
         }
         .dpad-btn {
-            background: rgba(255, 255, 255, 0.9);
-            color: #333;
-            border: 2px solid #666;
-            border-radius: 8px;
-            font-size: 18px;
+            background: rgba(255, 255, 255, 0.8);
+            color: #333333;
+            border: 3px solid #666;
+            border-radius: 12px;
+            font-size: 22px;
             font-weight: bold;
             cursor: pointer;
             display: flex;
@@ -123,55 +136,125 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
         }
         .dpad-btn:active {
-            background: #ff9800;
+            background: #707070;
             color: white;
         }
         .dpad-empty {
             pointer-events: none;
         }
 
-        /* 狀態與控制面板 */
+        /* 🌟 左上角 "..." 摺疊開關按鈕 */
+        #menu-toggle-btn {
+            position: absolute;
+            top: 20px;
+            left: 18px;
+            width: 44px;
+            height: 44px;
+            border-radius: 15px;
+            background: #f0f0f0;
+            border: 4px solid #194585;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            z-index: 1010;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #222222;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        /* 🌟 V1.2.11 核心調整：左上角側邊彈出面板（現在純粹存放操作按鈕） */
         #status-panel {
             position: absolute;
-            bottom: 25px;         
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            background: rgba(0, 0, 0, 0.88);
+            top: 100px;         
+            left: 18px;
+            z-index: 1009;
+            background: rgba(30, 30, 30, 0.8);
             color: #fff;
             padding: 12px;
-            border-radius: 12px;
+            border-radius: 14px;
             font-family: sans-serif;
-            text-align: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-            width: 310px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+            width: 180px;
+            border: 4px solid rgba(37,68,122,0.8);
+            
+            display: none;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        
+        #status-panel.menu-open {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
         }
         
         .btn-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px;
-            margin-top: 8px;
+            display: flex;
+            flex-direction: column; 
+            gap: 8px;
         }
         
         .panel-btn {
-            padding: 7px 4px;
-            border-radius: 6px;
+            padding: 8px 10px;
+            border-radius: 7px;
             border: none;
             cursor: pointer;
             font-weight: bold;
             font-size: 12px;
             color: white;
+            text-align: left; 
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
         .btn-mode-gps { background: #2196F3; }
         .btn-mode-dpad { background: #9c27b0; }
         .btn-io-download { background: #4CAF50; }
         .btn-io-upload { background: #FF9800; }
-        .btn-power-high { background: #e91e63; grid-column: span 2; }
-        .btn-power-save { background: #009688; grid-column: span 2; }
-        .btn-danger { background: #ff4d4d; grid-column: span 2; margin-top: 2px;}
+        .btn-power-high { background: #e04379; }
+        .btn-power-save { background: #009688; }
+        .btn-danger { background: #ff4d4d; }
 
-        /* 🌟 V1.2.09 新增：唯讀模式專用的巨大黃金遊戲召集連結 */
+        /* 🌟 V1.2.11 重大調整：常駐於畫面下方的純資訊面板（只保留標題與實時座標，移除所有按鈕） */
+        #bottom-info-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(10, 10, 10, 0.7);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 50px; /* 膠囊形狀設計 */
+            font-family: monospace, sans-serif;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            width: auto;
+            min-width: 280px;
+            max-width: 90%;
+            pointer-events: none; /* 穿透點擊，不干擾地圖操作 */
+            border: 3px solid rgba(224, 168, 47, 0.2);
+        }
+        .info-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #e0a82f;
+            margin-bottom: 2px;
+            font-family: sans-serif;
+        }
+        .info-coords {
+            font-size: 11px;
+            color: #f0f0f0;
+            line-height: 1.2;
+            font-family: monospace;
+        }
+
+        /* 唯讀模式專用的巨大黃金遊戲召集連結 */
         #join-game-banner {
             position: absolute;
             bottom: 30px;
@@ -188,14 +271,14 @@
             text-align: center;
             text-decoration: none;
             box-shadow: 0 8px 25px rgba(255,87,34,0.5);
-            display: none; /* 預設隱藏，只有唯讀模式會被程式強行打開 */
+            display: none; 
             animation: pulse 2s infinite;
             border: 2px solid #fff;
             white-space: nowrap;
         }
         @keyframes pulse {
             0% { transform: translateX(-50%) scale(1); }
-            50% { transform: translateX(-50%) scale(1.04); box-shadow: 0 12px 30px rgba(255,87,34,0.7); }
+            50% { transform: translateX(-50%) scale(1.08); box-shadow: 0 12px 30px rgba(255,87,34,0.7); }
             100% { transform: translateX(-50%) scale(1); }
         }
     </style>
@@ -207,23 +290,29 @@
         <canvas id="fog-canvas"></canvas>
     </div>
 
+    <!-- 左上角摺疊按鈕 "..." -->
+    <button id="menu-toggle-btn" onclick="toggleMenuPanel()">⚙️</button>
+
+    <!-- 中葡雙語路名框 -->
     <div id="location-bubble">
-        <span class="street-zh" id="bubble-zh">📍 正在尋找GPS訊號...</span>
-        <span class="street-pt" id="bubble-pt">Procura sinal de GPS...</span>
+        <span class="street-zh" id="bubble-zh">📍 正在尋找GPS訊號 ...</span>
+        <span class="street-pt" id="bubble-pt">         Procura sinal de GPS ...</span>
     </div>
 
+    <!-- 右側懸浮快捷鍵 -->
     <div class="action-buttons-container">
         <button class="circle-btn" onclick="recenterMap()">📍</button>
         <button class="circle-btn" onclick="shareAsReadOnlyUrl()">📤</button>
     </div>
 
+    <!-- 🕹️ 模擬測試專用 D-Pad -->
     <div id="dpad-container">
         <div class="dpad-empty"></div>
         <button class="dpad-btn" onclick="movePlayerSimulated('UP')">🔼</button>
         <div class="dpad-empty"></div>
         
         <button class="dpad-btn" onclick="movePlayerSimulated('LEFT')">◀️</button>
-        <div class="dpad-btn" style="background: #9c27b0; color: white; font-size: 14px;">🕹️</div>
+        <div class="dpad-btn" style="background: #54a8eb; color: white; font-size: 22px;">🕹️</div>
         <button class="dpad-btn" onclick="movePlayerSimulated('RIGHT')">▶️</button>
         
         <div class="dpad-empty"></div>
@@ -231,41 +320,48 @@
         <div class="dpad-empty"></div>
     </div>
 
+    <!-- 隱藏的手機本地檔案選擇器 -->
     <input type="file" id="file-selector" accept=".json" onchange="uploadSaveFile(event)" style="display: none;">
 
-    <a href="#" id="join-game-banner" onclick="redirectToPureGame(event)">✨ 我也要加入澳門實境探索！</a>
+    <!-- 給觀戰者看的「巨大黃金召集令按鈕」 -->
+    <a href="#" id="join-game-banner" onclick="redirectToPureGame(event)">✨我也要加入澳門實境探索✨</a>
 
+    <!-- 🌟 V1.2.11 調整：側邊下拉控制面板（現在純粹打包按鈕功能） -->
     <div id="status-panel">
-        <div id="panel-title" style="font-weight: bold; font-size: 15px; color: #ff9800; margin-bottom: 4px;">🗺️ 澳門探索地圖 (v1.2.09) 📸</div>
-        <div id="gps-status" style="font-size: 12px; min-height: 32px;">定位中...</div>
-        
-        <div class="btn-group" id="control-buttons-wrapper">
-            <button id="btn-toggle-mode" class="panel-btn btn-mode-gps" onclick="toggleControlMode()">切換模式：🛰️ GPS</button>
-            <button id="btn-toggle-power" class="panel-btn btn-power-high" onclick="togglePowerMode()">運行模式：⚡ 高效能模式</button>
+        <div class="btn-group">
+            <button id="btn-toggle-mode" class="panel-btn btn-mode-gps" onclick="toggleControlMode()">切換模式：🕹️D-Pad</button>
+            <button id="btn-toggle-power" class="panel-btn btn-power-high" onclick="togglePowerMode()">運行模式：⚡高效能模式</button>
             <button class="panel-btn btn-io-download" onclick="downloadSaveFile()">💾 下載目前進度</button>
             <button class="panel-btn btn-io-upload" onclick="triggerUploadClick()">📂 上載既有進度</button>
-            <button class="panel-btn btn-danger" onclick="resetGame()">🛑 清空全部紀錄</button>
+            <button class="panel-btn btn-danger" onclick="resetGame()">🛑 清除全部紀錄</button>
         </div>
     </div>
 
+    <!-- 🌟 V1.2.11 新增：底部常駐純狀態欄（保留標題、GPS座標與精準度） -->
+    <div id="bottom-info-bar">
+        <div class="info-title" id="bar-title">🗺️ 澳門探索地圖 (v1.2.11) 📸</div>
+        <div class="info-coords" id="gps-status">定位中...</div>
+    </div>
+
+    <!-- 引入外部庫 -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-geometryutil@0.10.3/src/leaflet.geometryutil.js"></script>
     
     <script>
         const macauBounds = L.latLngBounds(
-            L.latLng(22.0900, 113.5000), 
-            L.latLng(22.2300, 113.6200)  
+            L.latLng(22.0900, 113.5100), 
+            L.latLng(22.2300, 113.6100)  
         );
 
         let currentLat = 22.19746;
-        let currentLng = 113.549086;
+        let currentLng = 113.54086;
         let hasInitialPosition = false; 
         let unlockedPaths = []; 
         let playerMarker = null; 
         
         let isDpadMode = false; 
         let isPowerSaveMode = false; 
-        let isReadOnlyMode = false; // 🌟 V1.2.09 狀態鎖：標記目前是否處於唯讀觀戰狀態
+        let isReadOnlyMode = false; 
         let watchId = null;     
         let lastApiRequestTime = 0;
         const stepSize = 0.00015; 
@@ -296,6 +392,26 @@
             drawFog(); 
         }
         window.addEventListener('resize', resizeCanvas);
+
+        // 控制選單摺疊/展開切換邏輯
+        function toggleMenuPanel() {
+            if (isReadOnlyMode) return;
+            const panel = document.getElementById('status-panel');
+            const toggleBtn = document.getElementById('menu-toggle-btn');
+            const isOpen = panel.classList.contains('menu-open');
+            
+            if (isOpen) {
+                panel.classList.remove('menu-open');
+                panel.style.display = 'none';
+                toggleBtn.innerText = '⚙️';
+            } else {
+                panel.style.display = 'block';
+                setTimeout(() => {
+                    panel.classList.add('menu-open');
+                }, 10);
+                toggleBtn.innerText = '❌';
+            }
+        }
 
         // 雙層迷霧混合演算
         function drawFog() {
@@ -356,10 +472,10 @@
             isPowerSaveMode = !isPowerSaveMode;
             const powerBtn = document.getElementById('btn-toggle-power');
             if (isPowerSaveMode) {
-                powerBtn.innerText = "運行模式：🔋 省電模式";
+                powerBtn.innerText = "運行模式：🔋省電模式";
                 powerBtn.className = "panel-btn btn-power-save";
             } else {
-                powerBtn.innerText = "運行模式：⚡ 高效能模式";
+                powerBtn.innerText = "運行模式：⚡高效能模式";
                 powerBtn.className = "panel-btn btn-power-high";
             }
             setupMapRenderListeners();
@@ -408,38 +524,31 @@
 
         function isChinese(str) { return /[\u4e00-\u9fa5]/.test(str); }
 
-        // 🌟【V1.2.09 核心優化：打包生成唯讀分享連結】
+        // 打包生成唯讀分享連結
         function shareAsReadOnlyUrl() {
             if (unlockedPaths.length === 0) {
                 alert("目前地圖上一片空白，快去走走再分享吧！");
                 return;
             }
-
-            // 1. 高效數據精簡：將座標壓縮為 lat,lng 並保留5位小數，用分號隔開
             const compressedCoordinates = unlockedPaths.map(coord => {
                 return `${coord[0].toFixed(5)},${coord[1].toFixed(5)}`;
             }).join(';');
-
-            // 2. 組裝帶有參數的完整網址
             const baseUrl = window.location.origin + window.location.pathname;
             const finalShareUrl = `${baseUrl}?data=${encodeURIComponent(compressedCoordinates)}`;
 
-            // 3. 複製到手機剪貼簿 (調用現代瀏覽器 Clipboard API)
             navigator.clipboard.writeText(finalShareUrl).then(() => {
-                alert("🔗 唯讀觀戰連結已成功複製到剪貼簿！\n快分享給好友，讓他們見證你的開荒進度吧！");
+                alert("🔗 分享連結已成功複製到剪貼簿！\n快分享給好友吧！");
             }).catch(err => {
-                // 備用方案：如果瀏覽器安全權限不允許自動複製，直接彈窗讓玩家手動複製
-                prompt("手機不允許自動複製，請手動複製以下專屬連結：", finalShareUrl);
+                prompt("手機不允許自動複製，請手動複製連結：", finalShareUrl);
             });
         }
 
-        // 🌟【V1.2.09 核心優化：網頁啟動時的網址參數解碼引擎】
+        // 網頁啟動時的網址參數解碼引擎
         function checkUrlParametersEngine() {
             const urlParams = new URLSearchParams(window.location.search);
             const encryptedData = urlParams.get('data');
 
             if (encryptedData) {
-                // 🚨 啟動唯讀觀戰狀態
                 isReadOnlyMode = true;
                 
                 try {
@@ -457,15 +566,14 @@
                         currentLng = lastPoint[1];
                     }
 
-                    // 調整介面：隱藏底部的所有開發/修改按鈕
-                    document.getElementById('control-buttons-wrapper').style.display = "none";
-                    document.getElementById('panel-title').innerText = "👁️ 好友進度瀏覽中 (唯讀模式) 👁️";
-                    document.getElementById('gps-status').innerHTML = `本檔案共內含 ${unlockedPaths.length} 個已除霧足跡<br>點擊下方按鈕開始你自己的冒險！`;
+                    // 唯讀模式：將選單與底部資訊欄全部抽離，改用參戰按鈕替代
+                    document.getElementById('menu-toggle-btn').style.display = "none";
+                    document.getElementById('status-panel').style.display = "none";
+                    document.getElementById('bottom-info-bar').style.display = "none";
                     
-                    // 秀出炫目巨大的召集令按鈕
+                    document.getElementById('location-bubble').style.left = "16px";
                     document.getElementById('join-game-banner').style.display = "block";
-
-                    // 在地圖上擺放好友的位置標記
+                    
                     playerMarker = L.marker([currentLat, currentLng]).addTo(map);
                     map.setView([currentLat, currentLng], 17);
                     
@@ -473,24 +581,20 @@
                     updateStreetOverpass(currentLat, currentLng);
 
                 } catch (e) {
-                    alert("❌ 觀戰連結解析失敗，網址可能已被毀損！已自動切換回正常遊戲模式。");
+                    alert("❌ 連結解析失敗！已自動切換回正常遊戲。");
                     isReadOnlyMode = false;
-                    window.location.href = window.location.origin + window.location.pathname; // 強制洗掉網址
+                    window.location.href = window.location.origin + window.location.pathname;
                 }
-                return true; // 代表已被網址接管
+                return true; 
             }
-            return false; // 代表是正常玩家自己打開
+            return false; 
         }
 
-        // 🌟【V1.2.09 核心優化：點擊黃金連結，一鍵參戰】
         function redirectToPureGame(event) {
             event.preventDefault();
-            // 直接去除所有網址後缀參數，還原乾淨的遊戲大廳
-            const pureGameUrl = window.location.origin + window.location.pathname;
-            window.location.href = pureGameUrl;
+            window.location.href = window.location.origin + window.location.pathname;
         }
 
-        // 下載 JSON 檔案
         function downloadSaveFile() {
             if (isReadOnlyMode) return;
             if (unlockedPaths.length === 0) {
@@ -499,7 +603,7 @@
             }
             const saveData = {
                 gameIdentity: "Macau-Fog-Map-RPG",
-                version: "1.2.09",
+                version: "1.2.11",
                 downloadTimestamp: new Date().toISOString(),
                 lastLocation: [currentLat, currentLng],
                 exploredPaths: unlockedPaths 
@@ -513,11 +617,14 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            
+            toggleMenuPanel(); 
         }
 
-        function triggerUploadClick() { if(!isReadOnlyMode) document.getElementById('file-selector').click(); }
+        function triggerUploadClick() { 
+            if(!isReadOnlyMode) document.getElementById('file-selector').click(); 
+        }
 
-        // 解析玩家上傳檔案
         function uploadSaveFile(event) {
             if (isReadOnlyMode) return;
             const uploadedFile = event.target.files[0];
@@ -551,7 +658,9 @@
                     drawFog();
                     updateStreetOverpass(currentLat, currentLng);
                     updateStatusUI(0);
-                    alert(`🎉 上載成功！已成功加載檔案中 ${unlockedPaths.length} 個已探索足跡！`);
+                    
+                    toggleMenuPanel(); 
+                    alert(`🎉 上載成功！已加載 ${unlockedPaths.length} 個足跡！`);
                 } catch (err) {
                     alert("❌ 檔案解析失敗！");
                 }
@@ -571,7 +680,6 @@
             }
         }
 
-        // 雙模切換
         function toggleControlMode() {
             if (isReadOnlyMode) return;
             isDpadMode = !isDpadMode;
@@ -579,7 +687,7 @@
             const dpadBox = document.getElementById('dpad-container');
 
             if (isDpadMode) {
-                toggleBtn.innerText = "切換模式：🕹️ D-Pad";
+                toggleBtn.innerText = "切換模式：🛰️GPS";
                 toggleBtn.className = "panel-btn btn-mode-dpad";
                 dpadBox.style.display = "grid"; 
                 if (watchId !== null) {
@@ -591,14 +699,15 @@
                 updateStatusUI(0);
                 handleUnlock(currentLat, currentLng);
             } else {
-                toggleBtn.innerText = "切換模式：🛰️ GPS";
+                toggleBtn.innerText = "切換模式：🕹️D-Pad";
                 toggleBtn.className = "panel-btn btn-mode-gps";
                 dpadBox.style.display = "none"; 
                 startGpsTracking();
             }
+            
+            toggleMenuPanel(); 
         }
 
-        // D-Pad 模擬移動
         function movePlayerSimulated(direction) {
             if (!isDpadMode || isReadOnlyMode) return;
             let nextLat = currentLat;
@@ -649,7 +758,7 @@
         }
 
         function onLocationError(error) {
-            if (!isDpadMode && !isReadOnlyMode) document.getElementById('gps-status').innerText = `📡 GPS訊號搜尋中...`;
+            if (!isDpadMode && !isReadOnlyMode) document.getElementById('gps-status').innerText = `📡 GPS信號搜尋中...`;
         }
 
         function startGpsTracking() {
@@ -663,21 +772,22 @@
             }
         }
 
+        // 🌟 核心渲染：只把純文字資訊即時印在底部狀態欄
         function updateStatusUI(accuracy) {
             if (isReadOnlyMode) return;
             if (isDpadMode) {
-                document.getElementById('gps-status').innerHTML = `🕹️ 模擬位置: ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}<br>模式：沙盒測試中 (GPS暫停定位)`;
+                document.getElementById('gps-status').innerHTML = `🕹️ 模擬位置： Lat: ${currentLat.toFixed(5)}, Lng: ${currentLng.toFixed(5)}`;
             } else {
-                document.getElementById('gps-status').innerHTML = `🛰️ 實時位置: ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}<br>誤差值: ${accuracy.toFixed(1)} 米 (GPS定位中)`;
+                document.getElementById('gps-status').innerHTML = `🛰️ 實時位置： ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}<br>(誤差：±${accuracy.toFixed(1)}m) `;
             }
         }
 
         function recenterMap() {
-            if (hasInitialPosition || isReadOnlyMode) map.setView([currentLat, currentLng], 17, { animate: true, duration: 1.0 });
+            if (hasInitialPosition || isReadOnlyMode) map.setView([currentLat, currentLng], 17, { animate: true, duration: 0.6 });
         }
 
         function handleUnlock(lat, lng) {
-            if (isReadOnlyMode) return; // 唯讀模式不允許產生新腳印
+            if (isReadOnlyMode) return; 
             let shouldUnlock = true;
             if (unlockedPaths.length > 0) {
                 const lastPoint = unlockedPaths[unlockedPaths.length - 1];
@@ -695,21 +805,18 @@
 
         function resetGame() {
             if (isReadOnlyMode) return;
-            if (confirm("🚨 警告！這將會清空所有的數據，確定嗎？")) {
+            if (confirm("🚨 警告！這將會清除所有的數據，確定嗎？")) {
                 localStorage.removeItem('rpg_map_progress_v12');
                 localStorage.removeItem('rpg_map_last_latlng');
                 location.reload();
             }
         }
 
-        // 🚀 V1.2.09 啟動核心群
+        // 初始化啟動
         resizeCanvas(); 
         setupMapRenderListeners();
 
-        // 1. 優先檢查是不是從別人的分享連結點進來的
         const hasBeenInterceptedByUrl = checkUrlParametersEngine();
-
-        // 2. 如果是正常的本機玩家，執行常規的 GPS 啟動與本地存檔載入
         if (!hasBeenInterceptedByUrl) {
             autoLoadSavedProgress();
             startGpsTracking();
